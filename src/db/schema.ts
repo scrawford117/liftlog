@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { addCardioTemplates } from './cardioSeed';
 
-export type ExerciseKind = 'weighted' | 'bodyweight' | 'timed' | 'circuit';
+export type ExerciseKind = 'weighted' | 'bodyweight' | 'timed' | 'circuit' | 'cardio';
 
 export interface Exercise {
   id: number;
@@ -45,6 +46,18 @@ export interface DayExercise {
   flagUp: boolean;
   /** Clean sessions are counted only after this ISO timestamp (reset on accept/skip). */
   anchor?: string;
+  /** Cardio plan: distance (mi or km, per settings). */
+  distance?: number;
+  /** Cardio plan: total minutes. */
+  durationMin?: number;
+  /** Cardio plan: repeated work/rest intervals, e.g. sprints. */
+  intervals?: Intervals;
+}
+
+export interface Intervals {
+  rounds: number;
+  workSec: number;
+  restSec: number;
 }
 
 export type SessionStatus = 'in_progress' | 'done';
@@ -67,8 +80,13 @@ export interface SetLog {
   exerciseId: number;
   idx: number;
   weight: number;
+  /** Reps, seconds for timed work, or intervals completed for cardio. */
   reps: number;
   done: boolean;
+  /** Cardio: distance covered. */
+  distance?: number;
+  /** Cardio: total time in seconds. */
+  durationSec?: number;
 }
 
 export type PlanEntry = { kind: 'rest' } | { kind: 'workout'; dayId: number };
@@ -104,6 +122,15 @@ export class LiftDB extends Dexie {
       sets: '++id, sessionId, dayExerciseId, exerciseId',
       overrides: 'date',
       kv: 'key',
+    });
+    // v2: cardio. Existing installs get the cardio exercises and a starter Cardio program.
+    this.version(2).upgrade(async (tx) => {
+      await addCardioTemplates({
+        exercises: tx.table('exercises'),
+        programs: tx.table('programs'),
+        days: tx.table('days'),
+        dayExercises: tx.table('dayExercises'),
+      });
     });
   }
 }

@@ -6,6 +6,8 @@ import { useSettings } from '../db/hooks';
 import { suggestIncrease, type SessionSets, type Suggestion } from '../logic/progression';
 import { formatDate } from '../logic/dates';
 import { ExerciseCard } from '../components/ExerciseCard';
+import { CardioCard } from '../components/CardioCard';
+import { distanceUnit } from '../logic/cardio';
 import { useRestTimer } from '../components/RestTimer';
 import { keepScreenAwake } from '../components/alerts';
 
@@ -104,8 +106,8 @@ export function Workout({ sessionId, onClose }: { sessionId: number; onClose: ()
   return (
     <div>
       <div className="row between" style={{ marginTop: 4 }}>
-        <button className="btn small ghost" onClick={onClose}>← {editing ? 'Back' : 'Minimise'}</button>
-        <span className="pill accent">{doneCount}/{sets.length} sets</span>
+        <button className="btn small ghost" onClick={onClose} aria-label="Back">← Back</button>
+        <span className="pill accent">{doneCount}/{sets.length} done</span>
       </div>
       <h1 style={{ marginBottom: 2 }}>{day?.name ?? 'Workout'}</h1>
       <div className="row wrap muted small">
@@ -125,6 +127,19 @@ export function Workout({ sessionId, onClose }: { sessionId: number; onClose: ()
           {g.items.length > 1 && <div className="group-label">SUPERSET {g.label}</div>}
           {g.items.map((de) => {
             const ex = exs.get(de.exerciseId) as Exercise;
+            if (ex.kind === 'cardio') {
+              return (
+                <CardioCard
+                  key={de.id}
+                  de={de}
+                  ex={ex}
+                  set={setsBy.get(de.id)?.[0]}
+                  distUnit={distanceUnit(settings.units)}
+                  sound={settings.restSound}
+                  last={snap?.last.get(de.id)}
+                />
+              );
+            }
             return (
               <ExerciseCard
                 key={de.id}

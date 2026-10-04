@@ -71,4 +71,10 @@ describe('prefill', () => {
     expect(sets[0]).toMatchObject({ sessionId: 9, weight: 245, reps: 6, idx: 0, done: false });
     expect(sets[6]).toMatchObject({ dayExerciseId: 2, weight: 0, reps: 10 });
   });
+
+  it('prefills one cardio entry from the plan', () => {
+    const ex = new Map<number, Exercise>([[5, { id: 5, name: 'Outdoor Run', kind: 'cardio', increment: 0 }]]);
+    const sets = prefillSets(1, [{ ...de, id: 9, exerciseId: 5, sets: 1, target: 0, weight: 0, distance: 3, durationMin: 30 }], ex);
+    expect(sets).toEqual([expect.objectContaining({ dayExerciseId: 9, distance: 3, durationSec: 1800, reps: 0, done: false })]);
+  });
 });

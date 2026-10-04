@@ -2,7 +2,7 @@ import type { DayExercise, Session, SetLog } from '../db/schema';
 
 export interface SessionSets {
   session: Pick<Session, 'id' | 'date' | 'finishedAt' | 'status'>;
-  sets: Pick<SetLog, 'weight' | 'reps' | 'done'>[];
+  sets: Pick<SetLog, 'weight' | 'reps' | 'done' | 'distance' | 'durationSec'>[];
 }
 
 /** Every planned set finished at (or above) the working weight and target. */

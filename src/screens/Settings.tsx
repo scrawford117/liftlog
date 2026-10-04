@@ -86,6 +86,9 @@ export function Settings() {
       <div className="card">
         <button className="btn ghost danger block" onClick={reset}>Reset to original programs</button>
       </div>
+      <div className="muted small" style={{ textAlign: 'center', marginTop: 20 }}>
+        LiftLog v{__APP_VERSION__} · {__COMMIT__}
+      </div>
     </div>
   );
 }

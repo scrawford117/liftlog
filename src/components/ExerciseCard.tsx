@@ -3,11 +3,13 @@ import { db, type DayExercise, type Exercise, type SetLog } from '../db/schema';
 import { acceptIncrease, skipIncrease } from '../db/actions';
 import type { SessionSets, Suggestion } from '../logic/progression';
 import { formatDate } from '../logic/dates';
+import { cardioPlanLabel, distanceUnit } from '../logic/cardio';
 import { IconCheck, IconUp } from './Icons';
 import { useRestTimer } from './RestTimer';
 import { unlockAudio } from './alerts';
 
-export function targetLabel(ex: Exercise, de: Pick<DayExercise, 'sets' | 'target' | 'weight'>, units: string) {
+export function targetLabel(ex: Exercise, de: Pick<DayExercise, 'sets' | 'target' | 'weight' | 'distance' | 'durationMin' | 'intervals'>, units: string) {
+  if (ex.kind === 'cardio') return cardioPlanLabel(de, distanceUnit(units));
   if (ex.kind === 'circuit') return `${de.sets} rounds${de.weight ? ` · ${de.weight} ${units}` : ''}`;
   const t = ex.kind === 'timed' ? `${de.target}s` : `${de.target}`;
   return `${de.sets}×${t}${de.weight ? ` @ ${de.weight} ${units}` : ''}`;

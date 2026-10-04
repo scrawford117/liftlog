@@ -1,5 +1,6 @@
 import { db, DEFAULT_SETTINGS, setKV, type ExerciseKind, type WeeklySchedule } from './schema';
 import { today } from '../logic/dates';
+import { addCardioTemplates } from './cardioSeed';
 
 /**
  * Hand-transcribed from the Workout Notes files. Working weights come from the latest
@@ -274,6 +275,8 @@ export async function seed() {
         }
       }
     }
+
+    await addCardioTemplates(db);
 
     // Default: the Heavy split, Upper/Lower alternating Mon–Sat, Sunday rest.
     const w = (k: string) => ({ kind: 'workout' as const, dayId: dayIds.get(k)! });

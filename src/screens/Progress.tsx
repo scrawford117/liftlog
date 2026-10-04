@@ -5,6 +5,7 @@ import { db } from '../db/schema';
 import { useDayLabels, useSettings } from '../db/hooks';
 import { e1rm } from '../logic/progression';
 import { addDays, formatDate, today, weekStart } from '../logic/dates';
+import { distanceUnit, formatDuration, paceSec } from '../logic/cardio';
 
 const axis = { stroke: 'var(--muted)', fontSize: 11, tickLine: false, axisLine: false } as const;
 const tooltipStyle = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13 };
@@ -30,18 +31,39 @@ export function Progress({ openSession }: { openSession: (id: number) => void })
   const current = logged.find((e) => e.id === exId) ?? logged[0];
 
   // Per-session top weight and best e1RM for the selected exercise.
-  const series = new Map<string, { date: string; top: number; e1rm: number; reps: number }>();
+  const series = new Map<string, { date: string; top: number; e1rm: number; reps: number; distance: number; durationSec: number; pace?: number }>();
   for (const s of sets) {
     if (!current || s.exerciseId !== current.id) continue;
     const date = dateOf.get(s.sessionId)!;
-    const p = series.get(date) ?? { date, top: 0, e1rm: 0, reps: 0 };
+    const p = series.get(date) ?? { date, top: 0, e1rm: 0, reps: 0, distance: 0, durationSec: 0 };
+    p.distance += s.distance ?? 0;
+    p.durationSec += s.durationSec ?? 0;
     p.top = Math.max(p.top, current.kind === 'bodyweight' ? 0 : s.weight);
     p.e1rm = Math.max(p.e1rm, e1rm(s.weight, s.reps));
     p.reps = Math.max(p.reps, s.reps);
     series.set(date, p);
   }
-  const points = [...series.values()].sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ ...p, label: formatDate(p.date, { month: 'short', day: 'numeric' }) }));
+  const points = [...series.values()].sort((a, b) => a.date.localeCompare(b.date)).map((p) => {
+    const pace = paceSec(p.distance, p.durationSec);
+    return { ...p, pace: pace ? Math.round((pace / 60) * 100) / 100 : undefined, minutes: Math.round(p.durationSec / 60), label: formatDate(p.date, { month: 'short', day: 'numeric' }) };
+  });
   const isLoad = current && current.kind === 'weighted';
+  const isCardio = current && current.kind === 'cardio';
+  const dist = distanceUnit(units);
+
+  // Cardio bests per type, and this week's totals.
+  const cardioBests = logged
+    .filter((e) => e.kind === 'cardio')
+    .map((e) => {
+      const mine = sets.filter((s) => s.exerciseId === e.id);
+      const longest = mine.reduce((m, s) => Math.max(m, s.distance ?? 0), 0);
+      const paces = mine.map((s) => paceSec(s.distance, s.durationSec)).filter((x): x is number => x != null);
+      return { ex: e, longest, bestPace: paces.length ? Math.min(...paces) : null, count: mine.length };
+    });
+  const wk = weekStart(today());
+  const weekCardio = sets.filter((s) => s.distance != null || s.durationSec != null).filter((s) => weekStart(dateOf.get(s.sessionId)!) === wk);
+  const weekDist = weekCardio.reduce((t, s) => t + (s.distance ?? 0), 0);
+  const weekTime = weekCardio.reduce((t, s) => t + (s.durationSec ?? 0), 0);
 
   // PRs across all weighted exercises.
   const prs = logged
@@ -80,19 +102,31 @@ export function Progress({ openSession }: { openSession: (id: number) => void })
                 <LineChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="label" {...axis} />
-                  <YAxis {...axis} width={40} domain={['auto', 'auto']} />
+                  <YAxis yAxisId="left" {...axis} width={40} domain={['auto', 'auto']} />
+                  {isCardio && <YAxis yAxisId="right" orientation="right" {...axis} width={40} domain={['auto', 'auto']} reversed />}
                   <Tooltip contentStyle={tooltipStyle} />
-                  {isLoad ? (
+                  {isCardio ? (
                     <>
-                      <Line type="monotone" dataKey="top" name={`Top set (${units})`} stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="e1rm" name={`Est. 1RM (${units})`} stroke="var(--rest)" strokeWidth={2} strokeDasharray="4 3" dot={false} />
+                      <Line yAxisId="left" type="monotone" dataKey={points.some((p) => p.distance) ? 'distance' : 'minutes'} name={points.some((p) => p.distance) ? `Distance (${dist})` : 'Minutes'} stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="pace" name={`Pace (min/${dist})`} stroke="var(--rest)" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2 }} connectNulls />
+                    </>
+                  ) : isLoad ? (
+                    <>
+                      <Line yAxisId="left" type="monotone" dataKey="top" name={`Top set (${units})`} stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} />
+                      <Line yAxisId="left" type="monotone" dataKey="e1rm" name={`Est. 1RM (${units})`} stroke="var(--rest)" strokeWidth={2} strokeDasharray="4 3" dot={false} />
                     </>
                   ) : (
-                    <Line type="monotone" dataKey={current?.kind === 'timed' && points.some((p) => p.top) ? 'top' : 'reps'} name={current?.kind === 'timed' ? 'Weight' : 'Best reps'} stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line yAxisId="left" type="monotone" dataKey={current?.kind === 'timed' && points.some((p) => p.top) ? 'top' : 'reps'} name={current?.kind === 'timed' ? 'Weight' : 'Best reps'} stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} />
                   )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            {isCardio && (
+              <div className="legend">
+                <span><i style={{ background: 'var(--accent)' }} />{points.some((p) => p.distance) ? 'Distance' : 'Minutes'}</span>
+                <span><i style={{ background: 'var(--rest)' }} />Pace (right axis, faster is higher)</span>
+              </div>
+            )}
             {isLoad && (
               <div className="legend">
                 <span><i style={{ background: 'var(--accent)' }} />Top set</span>
@@ -101,8 +135,31 @@ export function Progress({ openSession }: { openSession: (id: number) => void })
             )}
           </div>
 
-          <h2>Personal records</h2>
-          <div className="card">
+          {cardioBests.length > 0 && (
+            <>
+              <h2>Cardio</h2>
+              <div className="card">
+                <div className="row between small" style={{ marginBottom: 6 }}>
+                  <span className="muted">This week</span>
+                  <strong>{Math.round(weekDist * 100) / 100} {dist} · {formatDuration(weekTime)}</strong>
+                </div>
+                <ul className="list">
+                  {cardioBests.map((b) => (
+                    <li key={b.ex.id} className="row between">
+                      <span className="grow">{b.ex.name}<div className="muted small">{b.count} logged</div></span>
+                      <span style={{ textAlign: 'right' }}>
+                        <strong>{b.longest ? `${b.longest} ${dist}` : '—'}</strong>
+                        <div className="muted small">{b.bestPace ? `best ${formatDuration(b.bestPace)} /${dist}` : 'longest'}</div>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {prs.length > 0 && <h2>Personal records</h2>}
+          {prs.length > 0 && <div className="card">
             <ul className="list">
               {prs.map((p) => (
                 <li key={p.ex.id} className="row between">
@@ -111,10 +168,10 @@ export function Progress({ openSession }: { openSession: (id: number) => void })
                 </li>
               ))}
             </ul>
-          </div>
+          </div>}
 
-          <h2>Weekly volume</h2>
-          <div className="card">
+          {volume.some((v) => v.volume > 0) && <h2>Weekly volume</h2>}
+          {volume.some((v) => v.volume > 0) && <div className="card">
             <div className="chart" style={{ height: 160 }}>
               <ResponsiveContainer>
                 <BarChart data={volume} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -127,7 +184,7 @@ export function Progress({ openSession }: { openSession: (id: number) => void })
               </ResponsiveContainer>
             </div>
             <div className="muted small">Weight × reps for all completed sets.</div>
-          </div>
+          </div>}
         </>
       )}
 

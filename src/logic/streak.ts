@@ -40,31 +40,38 @@ export function dayStatus(date: string, input: StreakInput): DayStatus {
 
 /**
  * Current streak: consecutive days ending today where you either trained or it was a
- * planned rest day. Today only counts once it is done (or a rest day); a pending
- * workout today doesn't break the streak.
+ * planned rest day. Rest days only carry a streak — a run has to start with a workout,
+ * so rest days alone never give you a streak. A pending workout today doesn't break it.
  */
 export function currentStreak(input: StreakInput): number {
   let count = 0;
+  let sinceWorkout = 0; // days counted since (back in time) the earliest workout seen
   let d = input.today;
   for (let i = 0; i < 3650; i++) {
     const s = dayStatus(d, input);
-    if (s === 'done' || s === 'rest') count++;
-    else if (s !== 'pending') break;
+    if (s === 'done') {
+      count++;
+      sinceWorkout = 0;
+    } else if (s === 'rest') {
+      count++;
+      sinceWorkout++;
+    } else if (s !== 'pending') break;
     d = addDays(d, -1);
   }
-  return count;
+  // Drop rest days before the first workout of the run.
+  return count - sinceWorkout;
 }
 
 export function longestStreak(input: StreakInput): number {
   if (!input.start) return currentStreak(input);
   let best = 0;
-  let run = 0;
+  let run = 0; // 0 until the run's first workout
   for (let d = input.start; d <= input.today; d = addDays(d, 1)) {
     const s = dayStatus(d, input);
-    if (s === 'done' || s === 'rest') {
-      run++;
-      best = Math.max(best, run);
-    } else if (s !== 'pending') run = 0;
+    if (s === 'done') run++;
+    else if (s === 'rest') run = run > 0 ? run + 1 : 0;
+    else if (s !== 'pending') run = 0;
+    best = Math.max(best, run);
   }
   return best;
 }

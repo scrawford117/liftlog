@@ -19,12 +19,16 @@ export function useActiveSessionId(): number | null | undefined {
 /** Everything needed to compute streaks and the plan for any date. */
 export function useStreakInput(): StreakInput | undefined {
   return useLiveQuery(async () => {
-    const [settings, weekly, overrides, done] = await Promise.all([
+    const [settings, weekly, overrides, finished, doneSets] = await Promise.all([
       getSettings(),
       getSchedule(),
       db.overrides.toArray(),
       db.sessions.where('status').equals('done').toArray(),
+      db.sets.filter((s) => s.done).toArray(),
     ]);
+    // Only workouts with at least one completed set count toward streaks.
+    const withWork = new Set(doneSets.map((s) => s.sessionId));
+    const done = finished.filter((s) => withWork.has(s.id));
     const ov = new Map<string, PlanEntry | null>(overrides.map((o) => [o.date, o.plan]));
     return {
       today: today(),

@@ -11,6 +11,13 @@ export function prefillSets(
     if (de.retired) continue;
     const ex = exercises.get(de.exerciseId);
     if (!ex) continue;
+    if (ex.kind === 'cardio') {
+      out.push({
+        sessionId, dayExerciseId: de.id, exerciseId: de.exerciseId, idx: 0, weight: 0, reps: 0, done: false,
+        distance: de.distance, durationSec: de.durationMin ? de.durationMin * 60 : undefined,
+      });
+      continue;
+    }
     for (let i = 0; i < de.sets; i++) {
       out.push({
         sessionId,

@@ -260,3 +260,27 @@ label.field > span { display: block; font-size: 13px; color: var(--muted); margi
 }
 .switch:checked { background: var(--good); border-color: var(--good); }
 .switch:checked::after { transform: translateX(18px); }
+
+/* Cardio */
+.cardio-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 10px; }
+.cardio-grid input { text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.intervals {
+  margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.intervals .iv-label { font-weight: 800; letter-spacing: 0.06em; font-size: 14px; }
+.intervals .iv-time { font-size: 48px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.1; margin: 4px 0 8px; }
+.intervals .iv-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.intervals .iv-bar > i { display: block; height: 100%; background: var(--accent); }
+.intervals.phase-work { background: var(--accent-soft); border-color: var(--accent); }
+.intervals.phase-work .iv-label, .intervals.phase-work .iv-time { color: var(--accent); }
+.intervals.phase-rest { background: var(--rest-soft); border-color: var(--rest); }
+.intervals.phase-rest .iv-label, .intervals.phase-rest .iv-time { color: var(--rest); }
+.intervals.phase-done { background: var(--good-soft); border-color: var(--good); }
+.intervals.phase-done .iv-label { color: var(--good); }
+
+/* iOS gives date inputs an intrinsic width that ignores width:100% */
+input[type='date'] {
+  -webkit-appearance: none; appearance: none; display: block; min-width: 0; max-width: 100%; text-align: left;
+}
+input[type='date']::-webkit-date-and-time-value { text-align: left; margin: 0; }

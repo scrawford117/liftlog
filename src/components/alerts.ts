@@ -28,24 +28,29 @@ export function unlockAudio() {
   }
 }
 
-export function playChime() {
+/** Plays a sequence of short beeps. */
+export function playTones(freqs: number[], beepSec = 0.18, gapSec = 0.04, volume = 0.6) {
   if (!ctx) return;
   if (ctx.state === 'suspended') void ctx.resume();
   const t0 = ctx.currentTime + 0.02;
-  // Three rising beeps.
-  [880, 988, 1319].forEach((freq, i) => {
-    const start = t0 + i * 0.22;
+  freqs.forEach((freq, i) => {
+    const start = t0 + i * (beepSec + gapSec);
     const osc = ctx!.createOscillator();
     const gain = ctx!.createGain();
     osc.type = 'sine';
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.6, start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+    gain.gain.exponentialRampToValueAtTime(volume, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + beepSec);
     osc.connect(gain).connect(ctx!.destination);
     osc.start(start);
-    osc.stop(start + 0.2);
+    osc.stop(start + beepSec + 0.02);
   });
+}
+
+/** Three rising beeps: rest is over. */
+export function playChime() {
+  playTones([880, 988, 1319]);
 }
 
 export function notificationsSupported() {

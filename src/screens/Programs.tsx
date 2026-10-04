@@ -5,6 +5,7 @@ import { setScheduleDay } from '../db/actions';
 import { useDayLabels, useSchedule, useSettings } from '../db/hooks';
 import { targetLabel } from '../components/ExerciseCard';
 import { Sheet } from '../components/Sheet';
+import { distanceUnit } from '../logic/cardio';
 
 const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const WD = [1, 2, 3, 4, 5, 6, 0];
@@ -181,7 +182,7 @@ function DayEditor({ dayId }: { dayId: number }) {
     const exs = new Map((await db.exercises.toArray()).map((e) => [e.id, e]));
     return des.map((de) => ({ de, ex: exs.get(de.exerciseId)! }));
   }, [dayId]);
-  const [editing, setEditing] = useState<DayExercise | 'new' | null>(null);
+  const [editing, setEditing] = useState<DayExercise | 'new' | 'cardio' | null>(null);
   if (!day || !rows || !settings) return null;
 
   const move = async (i: number, dir: -1 | 1) => {
@@ -220,14 +221,18 @@ function DayEditor({ dayId }: { dayId: number }) {
           ))}
         </ul>
         <div className="row between" style={{ marginTop: 8 }}>
-          <button className="btn small" onClick={() => setEditing('new')}>+ Exercise</button>
+          <div className="row">
+            <button className="btn small" onClick={() => setEditing('new')}>+ Exercise</button>
+            <button className="btn small" onClick={() => setEditing('cardio')}>+ Cardio</button>
+          </div>
           <button className="btn small ghost danger" onClick={removeDay}>Delete day</button>
         </div>
       </div>
       {editing && (
         <ExerciseSheet
           dayId={dayId}
-          de={editing === 'new' ? null : editing}
+          de={editing === 'new' || editing === 'cardio' ? null : editing}
+          cardio={editing === 'cardio'}
           nextOrder={rows.length ? Math.max(...rows.map((r) => r.de.order)) + 1 : 0}
           onClose={() => setEditing(null)}
         />
@@ -236,17 +241,25 @@ function DayEditor({ dayId }: { dayId: number }) {
   );
 }
 
-function ExerciseSheet({ dayId, de, nextOrder, onClose }: { dayId: number; de: DayExercise | null; nextOrder: number; onClose: () => void }) {
+function ExerciseSheet({ dayId, de, nextOrder, cardio, onClose }: {
+  dayId: number; de: DayExercise | null; nextOrder: number; cardio?: boolean; onClose: () => void;
+}) {
+  const settings = useSettings();
   const library = useLiveQuery(() => db.exercises.orderBy('name').toArray(), []);
   const original = library?.find((e) => e.id === de?.exerciseId);
-  const [name, setName] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(cardio ? 'Outdoor Run' : null);
   const [form, setForm] = useState({
     group: de?.group ?? '', sets: de?.sets ?? 4, target: de?.target ?? 8, weight: de?.weight ?? 0,
     notes: de?.notes ?? '', retired: de?.retired ?? false,
   });
-  const [kind, setKind] = useState<ExerciseKind | null>(null);
+  const [plan, setPlan] = useState({
+    distance: de?.distance, durationMin: de?.durationMin,
+    useIntervals: !!de?.intervals?.rounds,
+    rounds: de?.intervals?.rounds ?? 8, workSec: de?.intervals?.workSec ?? 30, restSec: de?.intervals?.restSec ?? 90,
+  });
+  const [kind, setKind] = useState<ExerciseKind | null>(cardio ? 'cardio' : null);
   const [increment, setIncrement] = useState<number | null>(null);
-  if (!library) return null;
+  if (!library || !settings) return null;
 
   const exName = name ?? original?.name ?? '';
   const match = library.find((e) => e.name.toLowerCase() === exName.trim().toLowerCase());
@@ -263,7 +276,13 @@ function ExerciseSheet({ dayId, de, nextOrder, onClose }: { dayId: number; de: D
     } else if (ex.kind !== exKind || ex.increment !== exInc) {
       await db.exercises.update(ex.id, { kind: exKind, increment: exInc });
     }
-    const data = { ...form, exerciseId: ex!.id, group: form.group.trim() };
+    const data = exKind === 'cardio'
+      ? {
+          ...form, sets: 1, target: 0, weight: 0, exerciseId: ex!.id, group: form.group.trim(),
+          distance: plan.distance || undefined, durationMin: plan.durationMin || undefined,
+          intervals: plan.useIntervals ? { rounds: plan.rounds, workSec: plan.workSec, restSec: plan.restSec } : undefined,
+        }
+      : { ...form, exerciseId: ex!.id, group: form.group.trim() };
     if (de) await db.dayExercises.update(de.id, data);
     else await db.dayExercises.add({ ...data, dayId, order: nextOrder, flagUp: false } as never);
     onClose();
@@ -285,7 +304,7 @@ function ExerciseSheet({ dayId, de, nextOrder, onClose }: { dayId: number; de: D
       <h2 style={{ marginTop: 0 }}>{de ? 'Edit exercise' : 'Add exercise'}</h2>
       <div className="stack">
         <label className="field"><span>Exercise</span>
-          <input type="text" list="ex-library" value={exName} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bench Press" />
+          <input type="text" list="ex-library" value={exName} onChange={(e) => setName(e.target.value)} placeholder={exKind === 'cardio' ? 'e.g. Outdoor Run' : 'e.g. Bench Press'} />
           <datalist id="ex-library">{library.map((e) => <option key={e.id} value={e.name} />)}</datalist>
         </label>
         <div className="grid2">
@@ -295,12 +314,46 @@ function ExerciseSheet({ dayId, de, nextOrder, onClose }: { dayId: number; de: D
               <option value="bodyweight">Bodyweight</option>
               <option value="timed">Timed</option>
               <option value="circuit">Circuit</option>
+              <option value="cardio">Cardio</option>
             </select>
           </label>
-          <label className="field"><span>Increase by</span>
-            <input type="number" inputMode="decimal" value={exInc} onChange={(e) => setIncrement(Number(e.target.value))} />
-          </label>
+          {exKind !== 'cardio' && (
+            <label className="field"><span>Increase by</span>
+              <input type="number" inputMode="decimal" value={exInc} onChange={(e) => setIncrement(Number(e.target.value))} />
+            </label>
+          )}
         </div>
+        {exKind === 'cardio' ? (
+          <>
+            <div className="grid2">
+              <label className="field"><span>Planned distance ({distanceUnit(settings.units)})</span>
+                <input type="number" inputMode="decimal" value={plan.distance ?? ''} placeholder="optional"
+                  onChange={(e) => setPlan((p) => ({ ...p, distance: e.target.value === '' ? undefined : Number(e.target.value) }))} />
+              </label>
+              <label className="field"><span>Planned time (min)</span>
+                <input type="number" inputMode="numeric" value={plan.durationMin ?? ''} placeholder="optional"
+                  onChange={(e) => setPlan((p) => ({ ...p, durationMin: e.target.value === '' ? undefined : Number(e.target.value) }))} />
+              </label>
+            </div>
+            <label className="row between clickable">
+              <span>Intervals (sprints, HIIT)</span>
+              <input type="checkbox" className="switch" checked={plan.useIntervals} onChange={(e) => setPlan((p) => ({ ...p, useIntervals: e.target.checked }))} />
+            </label>
+            {plan.useIntervals && (
+              <div className="grid3">
+                <label className="field"><span>Rounds</span>
+                  <input type="number" inputMode="numeric" value={plan.rounds} onChange={(e) => setPlan((p) => ({ ...p, rounds: Math.max(1, Number(e.target.value) || 1) }))} />
+                </label>
+                <label className="field"><span>Work (sec)</span>
+                  <input type="number" inputMode="numeric" value={plan.workSec} onChange={(e) => setPlan((p) => ({ ...p, workSec: Math.max(1, Number(e.target.value) || 1) }))} />
+                </label>
+                <label className="field"><span>Rest (sec)</span>
+                  <input type="number" inputMode="numeric" value={plan.restSec} onChange={(e) => setPlan((p) => ({ ...p, restSec: Math.max(0, Number(e.target.value) || 0) }))} />
+                </label>
+              </div>
+            )}
+          </>
+        ) : (
         <div className="grid3">
           <label className="field"><span>{exKind === 'circuit' ? 'Rounds' : 'Sets'}</span>
             <input type="number" inputMode="numeric" value={form.sets} onChange={(e) => set('sets', Number(e.target.value))} />
@@ -312,6 +365,7 @@ function ExerciseSheet({ dayId, de, nextOrder, onClose }: { dayId: number; de: D
             <input type="number" inputMode="decimal" value={form.weight} disabled={exKind === 'bodyweight'} onChange={(e) => set('weight', Number(e.target.value))} />
           </label>
         </div>
+        )}
         <div className="grid2">
           <label className="field"><span>Superset group</span>
             <input type="text" value={form.group} onChange={(e) => set('group', e.target.value.toUpperCase())} placeholder="A, B1, B2…" />
