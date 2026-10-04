@@ -7,6 +7,7 @@ import { suggestIncrease, type SessionSets, type Suggestion } from '../logic/pro
 import { formatDate } from '../logic/dates';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { useRestTimer } from '../components/RestTimer';
+import { keepScreenAwake } from '../components/alerts';
 
 interface Group { label: string; items: DayExercise[] }
 
@@ -58,6 +59,10 @@ export function Workout({ sessionId, onClose }: { sessionId: number; onClose: ()
     })();
     return () => { cancelled = true; };
   }, [sessionId]);
+
+  const inProgress = data?.session.status === 'in_progress';
+  const keepAwake = settings?.keepAwake ?? true;
+  useEffect(() => (inProgress && keepAwake ? keepScreenAwake() : undefined), [inProgress, keepAwake]);
 
   if (data === undefined || !settings) return null;
   if (data === null) {

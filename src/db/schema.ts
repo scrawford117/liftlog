@@ -116,9 +116,13 @@ export interface Settings {
   threshold: number;
   /** ISO date the streak may start counting from. */
   streakStart: string;
+  /** Play a chime when the rest timer ends. */
+  restSound: boolean;
+  /** Keep the screen on during a workout so the timer can alert. */
+  keepAwake: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { units: 'lb', threshold: 3, streakStart: '' };
+export const DEFAULT_SETTINGS: Settings = { units: 'lb', threshold: 3, streakStart: '', restSound: true, keepAwake: true };
 
 /** Weekly plan indexed by JS weekday (0 = Sunday). */
 export type WeeklySchedule = (PlanEntry | null)[];

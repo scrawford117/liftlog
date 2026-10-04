@@ -248,3 +248,15 @@ label.field > span { display: block; font-size: 13px; color: var(--muted); margi
   background: var(--bg); width: 100%; max-width: 560px; max-height: 88dvh; overflow: auto;
   border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
 }
+
+.switch {
+  appearance: none; -webkit-appearance: none; flex-shrink: 0;
+  width: 46px; height: 28px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border);
+  position: relative; cursor: pointer; transition: background 0.15s; margin: 0;
+}
+.switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); transition: transform 0.15s;
+}
+.switch:checked { background: var(--good); border-color: var(--good); }
+.switch:checked::after { transform: translateX(18px); }

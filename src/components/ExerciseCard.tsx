@@ -5,6 +5,7 @@ import type { SessionSets, Suggestion } from '../logic/progression';
 import { formatDate } from '../logic/dates';
 import { IconCheck, IconUp } from './Icons';
 import { useRestTimer } from './RestTimer';
+import { unlockAudio } from './alerts';
 
 export function targetLabel(ex: Exercise, de: Pick<DayExercise, 'sets' | 'target' | 'weight'>, units: string) {
   if (ex.kind === 'circuit') return `${de.sets} rounds${de.weight ? ` · ${de.weight} ${units}` : ''}`;
@@ -38,6 +39,7 @@ function NumInput({ value, onCommit, unit, label }: { value: number; onCommit: (
 export function SetRow({ set, ex, units, restSec }: { set: SetLog; ex: Exercise; units: string; restSec: number }) {
   const timer = useRestTimer();
   const toggle = async () => {
+    unlockAudio(); // must run synchronously inside the tap for iOS
     await db.sets.update(set.id, { done: !set.done });
     if (!set.done && restSec > 0) timer.start(restSec);
   };

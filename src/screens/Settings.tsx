@@ -4,11 +4,13 @@ import { updateSettings } from '../db/actions';
 import { downloadText, exportJSON, importJSON } from '../db/backup';
 import { seed } from '../db/seed';
 import { today } from '../logic/dates';
+import { notificationsSupported, playChime, requestNotifications, unlockAudio } from '../components/alerts';
 
 export function Settings() {
   const settings = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
+  const [perm, setPerm] = useState(() => (notificationsSupported() ? Notification.permission : 'unsupported'));
   if (!settings) return null;
 
   const doExport = async () => {
@@ -52,6 +54,23 @@ export function Settings() {
         </div>
       </div>
 
+      <h2>Rest timer alerts</h2>
+      <div className="card stack">
+        <Toggle label="Play a sound when rest is over" on={settings.restSound} onChange={(v) => updateSettings({ restSound: v })} />
+        <Toggle label="Keep screen on during workouts" on={settings.keepAwake} onChange={(v) => updateSettings({ keepAwake: v })} />
+        <div className="row wrap">
+          <button className="btn small" onClick={() => { unlockAudio(); playChime(); }}>Test sound</button>
+          {perm === 'default' && (
+            <button className="btn small" onClick={async () => setPerm(await requestNotifications())}>Enable notifications</button>
+          )}
+          {perm === 'granted' && <span className="pill good">Notifications on</span>}
+          {perm === 'denied' && <span className="pill">Notifications blocked in system settings</span>}
+        </div>
+        <div className="muted small">
+          On iPhone, the sound plays even with the silent switch on, as long as LiftLog is open. iOS pauses web apps when the screen locks, so keep the screen on during workouts. Notifications only show while the app is still running in the background. On iPhone that requires adding LiftLog to your Home Screen.
+        </div>
+      </div>
+
       <h2>Backup</h2>
       <div className="card stack">
         <div className="muted small">Your data lives only on this device. Export a backup now and then, and use it to move to a new phone.</div>
@@ -68,5 +87,14 @@ export function Settings() {
         <button className="btn ghost danger block" onClick={reset}>Reset to original programs</button>
       </div>
     </div>
+  );
+}
+
+function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="row between clickable">
+      <span>{label}</span>
+      <input type="checkbox" className="switch" checked={on} onChange={(e) => onChange(e.target.checked)} />
+    </label>
   );
 }

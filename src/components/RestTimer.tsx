@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useSettings } from '../db/hooks';
+import { restOverAlert, unlockAudio } from './alerts';
 
 interface Timer { endsAt: number; total: number }
 interface Ctx { timer: Timer | null; start: (seconds: number) => void; adjust: (delta: number) => void; stop: () => void }
@@ -10,7 +12,10 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
   const [timer, setTimer] = useState<Timer | null>(null);
   const ctx: Ctx = {
     timer,
-    start: (s) => setTimer({ endsAt: Date.now() + s * 1000, total: s }),
+    start: (s) => {
+      unlockAudio();
+      setTimer({ endsAt: Date.now() + s * 1000, total: s });
+    },
     adjust: (d) => setTimer((t) => (t ? { endsAt: t.endsAt + d * 1000, total: Math.max(1, t.total + d) } : t)),
     stop: () => setTimer(null),
   };
@@ -19,18 +24,26 @@ export function RestTimerProvider({ children }: { children: ReactNode }) {
 
 export function RestTimerBar() {
   const { timer, adjust, stop } = useRestTimer();
+  const settings = useSettings();
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     if (!timer) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
+    // Re-check immediately when returning to the app (timers are throttled in the background).
+    const onVisible = () => setNow(Date.now());
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [timer]);
 
   const left = timer ? Math.round((timer.endsAt - now) / 1000) : 1;
   const over = left <= 0;
   useEffect(() => {
-    if (over) navigator.vibrate?.([200, 100, 200]);
+    if (over) restOverAlert({ sound: settings?.restSound ?? true });
   }, [over]);
 
   if (!timer) return null;
@@ -43,8 +56,8 @@ export function RestTimerBar() {
       <div>
         <span className="time">{label}</span>
         <span className="bar"><i style={{ width: `${pct}%` }} /></span>
-        <button onClick={() => adjust(-15)}>−15</button>
-        <button onClick={() => adjust(15)}>+15</button>
+        <button onClick={() => { unlockAudio(); adjust(-15); }}>−15</button>
+        <button onClick={() => { unlockAudio(); adjust(15); }}>+15</button>
         <button onClick={stop} aria-label="Dismiss rest timer">✕</button>
       </div>
     </div>
