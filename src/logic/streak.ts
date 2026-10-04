@@ -29,9 +29,10 @@ export function planForDate(
 }
 
 export function dayStatus(date: string, input: StreakInput): DayStatus {
-  if (input.start && date < input.start) return 'before';
   if (date > input.today) return 'future';
+  // A logged workout always counts, even if it's dated before tracking started.
   if (input.doneDates.has(date)) return 'done';
+  if (input.start && date < input.start) return 'before';
   const plan = input.planFor(date);
   if (plan?.kind === 'rest') return 'rest';
   if (date === input.today) return 'pending';
@@ -66,7 +67,9 @@ export function longestStreak(input: StreakInput): number {
   if (!input.start) return currentStreak(input);
   let best = 0;
   let run = 0; // 0 until the run's first workout
-  for (let d = input.start; d <= input.today; d = addDays(d, 1)) {
+  const earliestDone = [...input.doneDates].sort()[0];
+  const from = earliestDone && earliestDone < input.start ? earliestDone : input.start;
+  for (let d = from; d <= input.today; d = addDays(d, 1)) {
     const s = dayStatus(d, input);
     if (s === 'done') run++;
     else if (s === 'rest') run = run > 0 ? run + 1 : 0;

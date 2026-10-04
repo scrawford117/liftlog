@@ -80,3 +80,9 @@ export async function acceptIncrease(de: DayExercise, to: number, activeSessionI
 export async function skipIncrease(de: DayExercise) {
   await db.dayExercises.update(de.id, { flagUp: false, anchor: new Date().toISOString() });
 }
+
+/** Logs an off-program session as finished in one step. */
+export async function logQuickSession(dayId: number, date: string, durationMin?: number, notes?: string): Promise<number> {
+  const now = new Date().toISOString();
+  return (await db.sessions.add({ date, dayId, status: 'done', startedAt: now, finishedAt: now, durationMin, notes } as never)) as number;
+}

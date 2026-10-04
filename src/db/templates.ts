@@ -51,3 +51,13 @@ export async function addCardioTemplates(t: Tables) {
     }
   }
 }
+
+export const OFF_PROGRAM_DAYS = ['Quick Lift', 'Quick Cardio', 'Sport / Activity', 'Mobility / Stretch'];
+
+/** Adds the built-in "Off Program" (quick sessions with no set tracking) if it's missing. */
+export async function addOffProgram(t: Pick<Tables, 'programs' | 'days'>) {
+  const programs = (await t.programs.toArray()) as { offProgram?: boolean }[];
+  if (programs.some((p) => p.offProgram)) return;
+  const programId = (await t.programs.add({ name: 'Off Program', restSec: 0, archived: false, offProgram: true })) as number;
+  for (const [order, name] of OFF_PROGRAM_DAYS.entries()) await t.days.add({ programId, name, order });
+}

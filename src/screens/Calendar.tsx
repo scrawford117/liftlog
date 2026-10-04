@@ -7,6 +7,7 @@ import { dayStatus } from '../logic/streak';
 import { formatDate, parseISODate, toISODate } from '../logic/dates';
 import { MonthGrid } from '../components/MonthGrid';
 import { DayPicker } from './Programs';
+import { QuickLogSheet } from '../components/QuickLogSheet';
 
 const STATUS_PILL: Record<string, [string, string]> = {
   done: ['good', 'Done'],
@@ -22,6 +23,7 @@ export function Calendar({ openSession }: { openSession: (id: number) => void })
   const labels = useDayLabels();
   const [month, setMonth] = useState(() => toISODate(new Date()));
   const [selected, setSelected] = useState<string>(() => toISODate(new Date()));
+  const [quick, setQuick] = useState<{ dayId: number | null } | null>(null);
   const sessions = useLiveQuery(() => db.sessions.where('date').equals(selected).toArray(), [selected]);
   const override = useLiveQuery(async () => (await db.overrides.get(selected)) ?? null, [selected]);
 
@@ -94,11 +96,20 @@ export function Calendar({ openSession }: { openSession: (id: number) => void })
         )}
 
         {selected <= input.today && plan?.kind === 'workout' && !sessions?.some((s) => s.status === 'done') && (
-          <button className="btn block" onClick={async () => openSession(await startSession(plan.dayId, selected))}>
+          <button
+            className="btn primary block"
+            onClick={async () => labels.get(plan.dayId)?.program.offProgram
+              ? setQuick({ dayId: plan.dayId })
+              : openSession(await startSession(plan.dayId, selected))}
+          >
             Log {labels.get(plan.dayId)?.day.name} for this day
           </button>
         )}
+        {selected <= input.today && (
+          <button className="btn block" onClick={() => setQuick({ dayId: null })}>Quick log (off program)</button>
+        )}
       </div>
+      {quick && <QuickLogSheet date={selected} dayId={quick.dayId} onClose={() => setQuick(null)} />}
     </div>
   );
 }

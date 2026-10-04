@@ -91,6 +91,10 @@ export function Workout({ sessionId, onClose }: { sessionId: number; onClose: ()
 
   const finish = async () => {
     const notes = (document.getElementById('session-notes') as HTMLTextAreaElement | null)?.value;
+    if (sets.length > 0 && doneCount === 0) {
+      if (!confirm('None of the sets are checked off. Mark them all done and finish?')) return;
+      await db.sets.where('sessionId').equals(session.id).modify({ done: true });
+    }
     timer.stop();
     await finishSession(session.id, notes);
     onClose();
@@ -102,6 +106,36 @@ export function Workout({ sessionId, onClose }: { sessionId: number; onClose: ()
     await deleteSession(session.id);
     onClose();
   };
+
+  if (program?.offProgram) {
+    return (
+      <div>
+        <button className="btn small ghost" onClick={onClose} aria-label="Back" style={{ marginTop: 4 }}>← Back</button>
+        <h1 style={{ marginBottom: 2 }}>{day?.name ?? 'Quick session'}</h1>
+        <div className="row wrap muted small">
+          <span>Off Program</span>·
+          <input
+            type="date"
+            aria-label="Workout date"
+            value={session.date}
+            onChange={(e) => e.target.value && db.sessions.update(session.id, { date: e.target.value })}
+            style={{ width: 'auto', minHeight: 32, padding: '4px 8px' }}
+          />
+        </div>
+        <div className="card stack" style={{ marginTop: 14 }}>
+          <label className="field"><span>Minutes</span>
+            <input type="number" inputMode="numeric" defaultValue={session.durationMin ?? ''}
+              onBlur={(e) => db.sessions.update(session.id, { durationMin: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <label className="field"><span>Notes</span>
+            <textarea defaultValue={session.notes ?? ''} onBlur={(e) => db.sessions.update(session.id, { notes: e.target.value })} />
+          </label>
+          <div className="muted small">Changes save automatically.</div>
+        </div>
+        <button className="btn ghost danger block" style={{ marginTop: 16 }} onClick={discard}>Delete</button>
+      </div>
+    );
+  }
 
   return (
     <div>

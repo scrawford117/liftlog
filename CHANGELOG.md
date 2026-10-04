@@ -4,6 +4,13 @@ LiftLog uses [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 Bump **minor** for new features, **patch** for fixes, and note any change to the saved-data
 format (it's migrated automatically on update).
 
+## 0.3.0 — 2026-10-04
+- **Off Program quick log**: Quick Lift, Quick Cardio, Sport / Activity, Mobility / Stretch. Log just time and notes from Today ("Short on time?") or any calendar day, and the day counts as complete. You can also plan a day as one of these. Rename the types or add your own under Programs → Off Program.
+- Fix: workouts logged for days before tracking started now show green on the calendar and count toward streaks.
+- Fix: a finished workout counts even if you didn't tick the sets. Finishing with nothing ticked now offers to mark them all done.
+- Today: "this week" shows workouts done and how many were planned.
+- Data: database schema v3 (adds Off Program). Existing data is upgraded automatically.
+
 ## 0.2.0 — 2026-10-04
 - **Cardio**: new Cardio exercise type with run, treadmill, bike, rower, swim and more. Plan distance, time and intervals; log distance and time, and see your pace.
 - **Interval timer** for sprints/HIIT: work/rest countdown with beeps and a 3-2-1 lead-in.

@@ -7,12 +7,14 @@ import { currentStreak, longestStreak, weekAdherence } from '../logic/streak';
 import { addDays, formatDate } from '../logic/dates';
 import { targetLabel } from '../components/ExerciseCard';
 import { DayPicker } from './Programs';
+import { QuickLogSheet } from '../components/QuickLogSheet';
 
 export function Today({ activeSessionId, openSession }: { activeSessionId: number | null; openSession: (id: number) => void }) {
   const input = useStreakInput();
   const labels = useDayLabels();
   const settings = useSettings();
   const [otherDay, setOtherDay] = useState<number | null>(null);
+  const [quick, setQuick] = useState<{ dayId: number | null } | null>(null);
 
   const plan = input?.planFor(input.today);
   const plannedDayId = plan?.kind === 'workout' ? plan.dayId : null;
@@ -31,7 +33,10 @@ export function Today({ activeSessionId, openSession }: { activeSessionId: numbe
   const week = weekAdherence(input.today, input);
   const doneToday = todaysSessions?.find((s) => s.status === 'done');
 
-  const start = async (dayId: number) => openSession(await startSession(dayId, input.today));
+  const start = async (dayId: number) => {
+    if (labels.get(dayId)?.program.offProgram) return setQuick({ dayId });
+    openSession(await startSession(dayId, input.today));
+  };
   const label = (dayId: number) => {
     const l = labels.get(dayId);
     return l ? `${l.day.name} · ${l.program.name}` : 'Unknown day';
@@ -45,7 +50,7 @@ export function Today({ activeSessionId, openSession }: { activeSessionId: numbe
       <div className="stats">
         <div className="stat hero"><div className="num">{streak}</div><div className="lbl">day streak</div></div>
         <div className="stat"><div className="num">{best}</div><div className="lbl">best streak</div></div>
-        <div className="stat"><div className="num">{week.done}/{week.planned}</div><div className="lbl">this week</div></div>
+        <div className="stat"><div className="num">{week.done}</div><div className="lbl">this week · {week.planned} planned</div></div>
       </div>
 
       {activeSessionId != null && (
@@ -75,6 +80,7 @@ export function Today({ activeSessionId, openSession }: { activeSessionId: numbe
             </div>
             {activeSessionId == null && <button className="btn primary" onClick={() => start(plan.dayId)}>Start</button>}
           </div>
+          {labels.get(plan.dayId)?.program.offProgram && <div className="muted small" style={{ marginTop: 6 }}>Quick session: just log the time and notes.</div>}
           <ul className="list" style={{ marginTop: 8 }}>
             {preview?.map(({ de, ex }) => (
               <li key={de.id} className="row between small">
@@ -101,6 +107,17 @@ export function Today({ activeSessionId, openSession }: { activeSessionId: numbe
           </div>
         </div>
       )}
+
+      {!doneToday && activeSessionId == null && (
+        <div className="card">
+          <div className="row between">
+            <div><strong>Short on time?</strong><div className="muted small">Log a quick off-program session</div></div>
+            <button className="btn" onClick={() => setQuick({ dayId: null })}>Quick log</button>
+          </div>
+        </div>
+      )}
+
+      {quick && <QuickLogSheet date={input.today} dayId={quick.dayId} onClose={() => setQuick(null)} />}
 
       <h2>Coming up</h2>
       <div className="card">

@@ -10,7 +10,10 @@ import { distanceUnit } from '../logic/cardio';
 const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const WD = [1, 2, 3, 4, 5, 6, 0];
 
-/** Select any training day, grouped by program (archived programs last). */
+/** Active programs first, then Off Program, then archived. */
+const rank = (p: Program) => (p.archived ? 2 : p.offProgram ? 1 : 0);
+
+/** Select any training day, grouped by program. */
 export function DayPicker({ value, onChange, extra }: {
   value: number | string | null;
   onChange: (dayId: number | null, raw: string) => void;
@@ -20,7 +23,7 @@ export function DayPicker({ value, onChange, extra }: {
   if (!labels) return null;
   const byProgram = new Map<number, { program: Program; days: { id: number; name: string }[] }>();
   const sorted = [...labels.values()].sort(
-    (a, b) => Number(a.program.archived) - Number(b.program.archived) || a.program.id - b.program.id || a.day.order - b.day.order,
+    (a, b) => rank(a.program) - rank(b.program) || a.program.id - b.program.id || a.day.order - b.day.order,
   );
   for (const { day, program } of sorted) {
     const g = byProgram.get(program.id) ?? { program, days: [] };
@@ -80,7 +83,7 @@ export function Programs() {
   if (!programs) return null;
   if (openId != null) return <ProgramEditor id={openId} onBack={() => setOpenId(null)} />;
 
-  const visible = programs.filter((p) => showArchived || !p.archived);
+  const visible = programs.filter((p) => showArchived || !p.archived).sort((a, b) => rank(a) - rank(b) || a.id - b.id);
   const addProgram = async () => {
     const id = (await db.programs.add({ name: 'New program', restSec: 90, archived: false } as never)) as number;
     await db.days.add({ programId: id, name: 'Day 1', order: 0 } as never);
@@ -148,6 +151,12 @@ function ProgramEditor({ id, onBack }: { id: number; onBack: () => void }) {
         <label className="field"><span>Name</span>
           <input type="text" defaultValue={program.name} onBlur={(e) => db.programs.update(id, { name: e.target.value.trim() || program.name })} />
         </label>
+        {program.offProgram ? (
+          <div className="muted small">
+            Built-in. Each day here is a quick session type: logging one asks only for the time and notes, and it marks the day complete.
+            Rename them or add your own (e.g. Basketball, Yoga).
+          </div>
+        ) : (
         <div className="grid2">
           <label className="field"><span>Rest between sets (sec)</span>
             <input type="number" inputMode="numeric" defaultValue={program.restSec} onBlur={(e) => db.programs.update(id, { restSec: Math.max(0, Number(e.target.value) || 0) })} />
@@ -159,22 +168,23 @@ function ProgramEditor({ id, onBack }: { id: number; onBack: () => void }) {
             </select>
           </label>
         </div>
+        )}
         <label className="field"><span>Notes</span>
           <input type="text" defaultValue={program.notes ?? ''} onBlur={(e) => db.programs.update(id, { notes: e.target.value })} />
         </label>
       </div>
 
-      {days.map((d) => <DayEditor key={d.id} dayId={d.id} />)}
+      {days.map((d) => <DayEditor key={d.id} dayId={d.id} quick={program.offProgram} />)}
 
       <div className="stack" style={{ marginTop: 16 }}>
-        <button className="btn block" onClick={addDay}>+ Add day</button>
-        <button className="btn ghost danger block" onClick={remove}>Delete program</button>
+        <button className="btn block" onClick={addDay}>{program.offProgram ? '+ Add quick type' : '+ Add day'}</button>
+        {!program.offProgram && <button className="btn ghost danger block" onClick={remove}>Delete program</button>}
       </div>
     </div>
   );
 }
 
-function DayEditor({ dayId }: { dayId: number }) {
+function DayEditor({ dayId, quick }: { dayId: number; quick?: boolean }) {
   const settings = useSettings();
   const day = useLiveQuery(() => db.days.get(dayId), [dayId]);
   const rows = useLiveQuery(async () => {
@@ -199,6 +209,16 @@ function DayEditor({ dayId }: { dayId: number }) {
     await db.dayExercises.where('dayId').equals(dayId).delete();
     await db.days.delete(dayId);
   };
+
+  if (quick) {
+    return (
+      <div className="card row" style={{ marginTop: 10 }}>
+        <input type="text" aria-label="Quick type name" className="grow" defaultValue={day.name}
+          onBlur={(e) => db.days.update(dayId, { name: e.target.value.trim() || day.name })} />
+        <button className="btn small ghost danger" onClick={removeDay}>Delete</button>
+      </div>
+    );
+  }
 
   return (
     <>

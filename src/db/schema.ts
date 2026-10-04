@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import { addCardioTemplates } from './cardioSeed';
+import { addCardioTemplates, addOffProgram } from './templates';
 
 export type ExerciseKind = 'weighted' | 'bodyweight' | 'timed' | 'circuit' | 'cardio';
 
@@ -19,6 +19,8 @@ export interface Program {
   restSec: number;
   archived: boolean;
   notes?: string;
+  /** Built-in "Off Program": quick sessions logged with just time and notes, no sets. */
+  offProgram?: boolean;
 }
 
 export interface ProgramDay {
@@ -71,6 +73,8 @@ export interface Session {
   notes?: string;
   startedAt: string;
   finishedAt?: string;
+  /** Quick (off-program) sessions: how long it took. */
+  durationMin?: number;
 }
 
 export interface SetLog {
@@ -132,6 +136,8 @@ export class LiftDB extends Dexie {
         dayExercises: tx.table('dayExercises'),
       });
     });
+    // v3: built-in Off Program for quick sessions.
+    this.version(3).upgrade((tx) => addOffProgram({ programs: tx.table('programs'), days: tx.table('days') }));
   }
 }
 

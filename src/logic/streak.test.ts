@@ -56,6 +56,14 @@ describe('streak', () => {
     expect(currentStreak(input(done, { start: '2026-10-01' }))).toBe(2);
   });
 
+  it('a workout logged before tracking started still counts', () => {
+    const i = input(['2026-10-02', '2026-10-03'], { start: '2026-10-03' });
+    expect(dayStatus('2026-10-02', i)).toBe('done');
+    expect(dayStatus('2026-10-01', i)).toBe('before');
+    expect(currentStreak(i)).toBe(2);
+    expect(longestStreak(i)).toBe(2);
+  });
+
   it('tracks the longest streak', () => {
     // 20 rest (no workout yet, not counted), 21..26 done, 27 rest => 7, then 28 missed
     const done = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-10-02'];
